@@ -1,0 +1,10 @@
+# Install a CUDA build of PyTorch for your GPU first (https://pytorch.org).
+torch>=2.6
+transformers>=4.57.1
+accelerate
+peft
+qwen-vl-utils>=0.0.14
+numpy
+Pillow
+openai>=1.40          # API baselines and teacher-argument generation
+yt-dlp                # scripts/download_frames.py (also needs ffmpeg on PATH)

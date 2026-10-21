@@ -1,0 +1,13 @@
+# frames are not redistributed (see README)
+data/mechscam/samples/*/*/frames/
+# models, generated training files and experiment outputs
+models/
+work/
+logs/
+scamcourt/data/
+scamcourt/data_glm/
+scamcourt/runs/
+scamcourt/runs_glm/
+__pycache__/
+*.pyc
+.DS_Store
