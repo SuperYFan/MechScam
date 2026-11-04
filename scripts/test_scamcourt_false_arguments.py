@@ -206,8 +206,8 @@ class ScamCourtTests(unittest.TestCase):
         export = [sys.executable, str(script), "--project-root", str(self.root), "--no-scores",
                   "--roles", "false_opening,false_rebuttal,true_opening,true_rebuttal,judge"]
         out_dir = self.root / "work/sft_coldstart"
-        # Without step-2 rewritten openings nothing is exported (template style would leak the answer).
-        res = subprocess.run(export, capture_output=True, text=True)
+        # Strict mode can still require a rewritten opening instead of a stored reference.
+        res = subprocess.run(export + ["--no-allow-template-true-opening"], capture_output=True, text=True)
         self.assertEqual(res.returncode, 0, res.stderr)
         summary = json.loads((out_dir / "export_summary.json").read_text())
         self.assertEqual(summary["counts"]["skipped_without_true_opening"], 2)

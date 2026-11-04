@@ -610,26 +610,47 @@ def repair_citation(citation: dict, source_texts: dict[str, str], frame_ids: set
 # ---------------------------------------------------------------- true-side openings (step 2)
 
 def load_true_openings(directory: Path) -> dict[str, dict]:
-    """sample_id -> step-2 record (only generated/reviewed ones with an opening)."""
+    """Load existing openings; public records need no generation-status fields."""
     result = {}
     if not directory.is_dir():
         return result
     for path in directory.glob("*/*.json"):
         rec = read_json(path)
-        if rec.get("review_status") in ("generated", "reviewed") and rec.get("opening"):
+        if rec.get("opening"):
             result[rec["sample_id"]] = rec
     return result
 
 
 def true_opening_for(record: dict, true_openings: dict[str, dict], allow_template: bool) -> tuple[dict, str] | None:
-    """Advocate-style true opening for a step-1 record, or the template when explicitly allowed.
+    """Read an existing rewritten opening or, when enabled, the stored reference.
 
     Returns (opening, provenance) where provenance identifies the exact text used (for fingerprints),
     or None when no usable opening exists. A step-2 record made from an older step-1 record is ignored.
     """
     rec = true_openings.get(record["sample_id"])
-    if rec and rec.get("arguments_fingerprint") == record["input_fingerprint"]:
-        return rec["opening"], "rewritten:" + rec["input_fingerprint"]
-    if allow_template:
+    expected = record.get("input_fingerprint")
+    linked = rec.get("arguments_fingerprint") if rec else None
+    if rec and rec.get("opening") and (
+            (expected is None and linked is None) or
+            (expected is not None and linked == expected)):
+        fingerprint = rec.get("input_fingerprint")
+        return rec["opening"], ("rewritten:" + fingerprint if fingerprint else "released")
+    if allow_template and record.get("reference_opening"):
         return record["reference_opening"], "template"
     return None
+
+
+def score_matches_record(score: dict, record: dict, true_provenance: str | None = None) -> bool:
+    """Accept released score records; check old cache metadata when it is present."""
+    if score.get("sample_id") != record.get("sample_id"):
+        return False
+    if len(score.get("arguments", [])) != len(record.get("arguments", [])):
+        return False
+    score_fingerprint = score.get("input_fingerprint")
+    record_fingerprint = record.get("input_fingerprint")
+    if score_fingerprint is not None and record_fingerprint is not None and score_fingerprint != record_fingerprint:
+        return False
+    provenance = score.get("true_opening_provenance")
+    if provenance is not None and true_provenance is not None and provenance != true_provenance:
+        return False
+    return True

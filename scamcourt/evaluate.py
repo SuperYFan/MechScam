@@ -25,8 +25,8 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from sc_utils import (DEFAULT_DATASET, DEFAULT_EXCLUSIONS, DEFAULT_SPLIT, LABELS, ROOT, Dataset,  # noqa: E402
-                      adversarial_metrics, check_config, has_risk_cues, judge_metrics, load_exclusions, load_split,
+from sc_utils import (DEFAULT_DATASET, DEFAULT_SPLIT, LABELS, ROOT, Dataset,  # noqa: E402
+                      adversarial_metrics, check_config, has_risk_cues, judge_metrics, load_split,
                       mean, parse_verdict, read_jsonl, refresh_gold, scc, select_ids, write_json)
 
 
@@ -35,7 +35,6 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--project-root", type=Path, default=ROOT)
     p.add_argument("--dataset-dir", type=Path, default=DEFAULT_DATASET)
     p.add_argument("--split-file", type=Path, default=DEFAULT_SPLIT)
-    p.add_argument("--exclusions", type=Path, default=DEFAULT_EXCLUSIONS)
     p.add_argument("--split", default="test")
     p.add_argument("--mode", choices=("no_debate", "debate", "adversarial"), required=True)
     p.add_argument("--debates", type=Path, help="debates.jsonl (debate mode); sample k=0 is used")
@@ -59,15 +58,15 @@ def parser() -> argparse.ArgumentParser:
     return p
 
 
-def items_for(args, root: Path, ds: Dataset, excluded: set[str]) -> list[dict]:
+def items_for(args, root: Path, ds: Dataset) -> list[dict]:
     """Each item: id, sample_id, transcript spec (None / model debate / teacher protocol)."""
     split = load_split(root, args.split_file)
     if args.mode == "no_debate":
-        return [{"id": sid, "sample_id": sid, "kind": "none"} for sid in select_ids(ds.rows, split, args.split, excluded)]
+        return [{"id": sid, "sample_id": sid, "kind": "none"} for sid in select_ids(ds.rows, split, args.split)]
     if args.mode == "debate":
         if not args.debates:
             raise SystemExit("ERROR: --debates is required in debate mode")
-        wanted = set(select_ids(ds.rows, split, args.split, excluded))
+        wanted = set(select_ids(ds.rows, split, args.split))
         recs = [r for r in read_jsonl(root / args.debates) if r["k"] == 0 and r["sample_id"] in wanted]
         missing = wanted - {r["sample_id"] for r in recs}
         if missing:
@@ -76,7 +75,8 @@ def items_for(args, root: Path, ds: Dataset, excluded: set[str]) -> list[dict]:
                  "view": args.debate_view}
                 for r in sorted(recs, key=lambda r: r["sample_id"])]
     protocols = [p.strip() for p in args.protocols.split(",") if p.strip()]
-    rows = [r for r in read_jsonl(root / args.adv_file) if r["sample_id"] not in excluded]
+    wanted = set(select_ids(ds.rows, split, args.split))
+    rows = [r for r in read_jsonl(root / args.adv_file) if r["sample_id"] in wanted]
     if any(r["sample_id"] in split["train"] for r in rows):
         raise SystemExit("ERROR: the adversarial file contains training videos")
     items = [{"id": f"{sid}#base", "sample_id": sid, "kind": "none"} for sid in sorted({r["sample_id"] for r in rows})]
@@ -124,8 +124,7 @@ def main() -> int:
         raise SystemExit("ERROR: pass exactly one of --adapter or --no-adapter")
     root = args.project_root.expanduser().resolve()
     ds = Dataset(root, args.dataset_dir)
-    excluded = load_exclusions(root, args.exclusions if str(args.exclusions) else None)
-    items = items_for(args, root, ds, excluded)
+    items = items_for(args, root, ds)
     if args.limit:
         keep = sorted({it["sample_id"] for it in items})[:args.limit]
         items = [it for it in items if it["sample_id"] in set(keep)]
@@ -189,7 +188,7 @@ def main() -> int:
                     if it["kind"] in ("single", "full"):
                         a = it["adv"]
                         row.update(item_id=a["item_id"], protocol=it["kind"], strategy=a["strategy"],
-                                   argument_strength=a["argument_strength"], weak_case_mode=a["weak_case_mode"],
+                                   argument_strength=a["argument_strength"], weak_case_mode=a.get("weak_case_mode", False),
                                    qwen_selected=a["qwen_selected"], gold_label=a["gold_label"],
                                    gold_subtype=a["gold_subtype"])
                     if it["kind"] == "model_debate":

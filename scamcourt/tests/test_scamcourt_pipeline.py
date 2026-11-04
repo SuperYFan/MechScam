@@ -28,7 +28,6 @@ import scamcourt_common as scc  # noqa: E402
 
 TRAIN = ["vidscamnet:scamA", "youtube_scam:nonB", "vidscamnet:scamC", "youtube_scam:nonF"]
 TEST = ["youtube_scam:nonD", "vidscamnet:scamE"]
-EXCLUDED = ["youtube_scam:nonF"]
 
 
 def clone_video(root: Path, src: str, dst: str) -> None:
@@ -93,8 +92,6 @@ def build_project(root: Path) -> None:
     splits = root / "data/splits"
     splits.mkdir(parents=True, exist_ok=True)
     (splits / "scamcourt_v3_seed42.json").write_text(json.dumps({"train": TRAIN, "test": TEST}))
-    (root / "data/splits/exclusions.json").write_text(json.dumps(
-        {"excluded": [{"sample_id": s} for s in EXCLUDED]}))
 
 
 def run(main, argv: list[str]) -> int:
@@ -103,6 +100,21 @@ def run(main, argv: list[str]) -> int:
 
 
 class UtilsTest(unittest.TestCase):
+    def test_split_selection_uses_all_training_ids(self):
+        split = {"train": set(TRAIN), "test": set(TEST)}
+        self.assertEqual(sc_utils.select_ids(TRAIN + TEST, split, "train"), sorted(TRAIN))
+        self.assertEqual(sc_utils.select_ids(TRAIN + TEST, split, "test"), sorted(TEST))
+
+    def test_cleaned_openings_and_scores_need_no_cache_fields(self):
+        reference = {"claimed_subtype": "N03", "argument": "Existing text", "citations": []}
+        record = {"sample_id": "youtube_scam:nonF", "reference_opening": reference, "arguments": [{}, {}, {}]}
+        true = {record["sample_id"]: {"opening": reference}}
+        self.assertEqual(scc.true_opening_for(record, true, False), (reference, "released"))
+        self.assertEqual(scc.true_opening_for(record, {}, True), (reference, "template"))
+        score = {"sample_id": record["sample_id"], "arguments": [{}, {}, {}]}
+        self.assertTrue(scc.score_matches_record(score, record, "released"))
+        self.assertFalse(scc.score_matches_record({**score, "sample_id": "other"}, record))
+
     def test_parse_outputs(self):
         op, err = sc_utils.parse_opening('```json\n{"claim_label":"Scam","claimed_subtype":"S03","argument":" a  b ",'
                                          '"citations":[{"source_id":"ASR_0001","quote":"x"},"bad"]}\n```',
@@ -227,6 +239,42 @@ class PipelineTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
+    def test_cleaned_release_export_uses_existing_data(self):
+        import build_scamcourt_coldstart_sft as export
+        import build_adversarial_testset
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            build_project(root)
+            process_keys = {"review_status", "review_reason", "prompt_version", "input_fingerprint",
+                            "arguments_fingerprint", "base_fingerprint", "weak_case_mode",
+                            "source_sample_path", "seed_observation_count"}
+            for path in (root / "data/arguments").glob("*/*/*.json"):
+                rec = json.loads(path.read_text(encoding="utf-8"))
+                rec = {key: value for key, value in rec.items() if key not in process_keys}
+                if path.parent.name == "youtube_scam" and path.name == "nonF.json" and path.parent.parent.name == "true_openings":
+                    rec["opening"] = None
+                path.write_text(json.dumps(rec), encoding="utf-8")
+            scores = []
+            for sid in TRAIN[:-1]:
+                ds, vid = sid.split(":")
+                record = json.loads((root / "data/arguments/teacher_arguments" / ds / f"{vid}.json").read_text())
+                scores.append({"sample_id": sid, "selected_index": 0,
+                               "arguments": [{"p_wrong": 0.9 - i * 0.1} for i in range(len(record["arguments"]))],
+                               "baseline": {"p_wrong": 0.1}})
+            path = root / "data/arguments/qwen3_vl_8b_scores/scores.jsonl"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("\n".join(json.dumps(row) for row in scores) + "\n")
+            args = ["--project-root", str(root), "--split-file", "data/splits/scamcourt_v3_seed42.json",
+                    "--roles", "false_opening,false_rebuttal,true_opening,true_rebuttal,judge"]
+            self.assertEqual(run(export.main, args), 0)
+            for role in ("false_opening", "false_rebuttal", "true_opening", "true_rebuttal", "judge"):
+                rows = [json.loads(line) for line in (root / "work/sft_coldstart" / f"{role}.jsonl").read_text().splitlines()]
+                self.assertEqual({row["meta"]["sample_id"] for row in rows}, set(TRAIN))
+            self.assertEqual(run(build_adversarial_testset.main, ["--project-root", str(root)]), 0)
+            rows = [json.loads(line) for line in (root / "data/adversarial_test.jsonl").read_text().splitlines()]
+            self.assertEqual(len(rows), 3 * len(TEST))
+            self.assertTrue(all(row["true_opening"] for row in rows))
+
     def test_end_to_end(self):
         import fake_torch
         saved = {k: sys.modules.get(k) for k in fake_torch.FAKE_MODULES}
@@ -262,13 +310,16 @@ class PipelineTest(unittest.TestCase):
             self.assertEqual(rebuilt["messages"][1], ex["messages"][1])
             self.assertEqual(rebuilt["images"], ex["images"])
 
-            # Step 4: debater SFT (the excluded clone nonF is dropped).
+            # Step 4: debater SFT uses every available example in the training split.
             roles = [f"{sft}/{r}.jsonl" for r in ("false_opening", "false_rebuttal", "true_opening", "true_rebuttal")]
             self.assertEqual(run(train_sft.main, R + ["--data", *roles, "--output-dir", "runs/debater",
                                                       "--grad-accum", "2", "--epochs", "1", "--log-every", "1"]), 0)
             self.assertTrue((root / "runs/debater/adapter").is_dir())
             cfg = json.loads((root / "runs/debater/train_config.json").read_text())
-            self.assertGreater(cfg["example_counts"]["dropped_excluded"], 0)
+            self.assertEqual(cfg["example_counts"].get("dropped_not_in_train_split", 0), 0)
+            train_args = train_sft.parser().parse_args(R + ["--data", *roles, "--output-dir", "runs/check"])
+            training_examples, _ = train_sft.load_examples(train_args, root)
+            self.assertEqual({e["meta"]["sample_id"] for e in training_examples}, set(TRAIN))
             self.assertTrue((root / "runs/debater/train_log.jsonl").exists())
 
             # Step 5: debates (2 samples per training video, greedy on test).
@@ -276,8 +327,8 @@ class PipelineTest(unittest.TestCase):
                 self.assertEqual(run(run_debate.main, R + ["--split", split, "--adapter", "runs/debater/adapter",
                                                            "--output-dir", f"runs/debates_{split}", *extra]), 0)
             train_deb = [json.loads(l) for l in (root / "runs/debates_train/debates.jsonl").read_text().splitlines()]
-            self.assertEqual(len(train_deb), 2 * (len(TRAIN) - len(EXCLUDED)))
-            self.assertNotIn("youtube_scam:nonF", {r["sample_id"] for r in train_deb})
+            self.assertEqual(len(train_deb), 2 * len(TRAIN))
+            self.assertEqual({r["sample_id"] for r in train_deb}, set(TRAIN))
             r0 = train_deb[0]
             self.assertEqual(r0["openings"]["prosecution"]["claim_label"], "Scam")
             self.assertEqual(r0["citations"]["prosecution"]["opening"], {"n": 2, "verified": 1})
@@ -303,7 +354,7 @@ class PipelineTest(unittest.TestCase):
             target = json.loads(jr[0]["messages"][2]["content"])
             self.assertEqual(target["label"], jr[0]["meta"]["gold_label"])
             self.assertEqual(run(build_judge_data.main, R + ["--classifier-only", "--output", "data/cls.jsonl"]), 0)
-            self.assertEqual(len((root / "data/cls.jsonl").read_text().splitlines()), len(TRAIN) - len(EXCLUDED))
+            self.assertEqual(len((root / "data/cls.jsonl").read_text().splitlines()), len(TRAIN))
             self.assertEqual(run(train_sft.main, R + ["--data", f"{sft}/judge.jsonl", "data/judge_rollouts.jsonl",
                                                       "--output-dir", "runs/judge", "--grad-accum", "2"]), 0)
             # Examples of test videos never reach training.

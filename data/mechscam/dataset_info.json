@@ -1,0 +1,24 @@
+{
+  "name": "MechScam",
+  "videos": 6614,
+  "frames": 418442,
+  "binary_label_counts": {
+    "Scam": 2184,
+    "Non-scam": 4430
+  },
+  "primary_category_counts": {
+    "N01": 294,
+    "N02": 1428,
+    "N03": 1351,
+    "N04": 363,
+    "N05": 351,
+    "N06": 643,
+    "S01": 214,
+    "S02": 363,
+    "S03": 325,
+    "S04": 448,
+    "S05": 327,
+    "S06": 507
+  },
+  "note": "Frames are not distributed; see README (data access and copyright)."
+}

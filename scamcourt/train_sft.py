@@ -6,7 +6,7 @@ Used for both models:
   judge   : --data .../judge.jsonl (teacher debates) scamcourt/data/judge_rollouts.jsonl (own debates)
 
 Only videos of the training split are used (meta.sample_id is checked against --split-file;
-anything else, and anything in the exclusion list, is dropped and counted). Loss is on the
+examples outside that split are dropped and counted). Loss is on the
 assistant answer only. One rolling checkpoint (adapter_latest) is kept; the final adapter is
 written to <output-dir>/adapter.
 """
@@ -24,7 +24,7 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from sc_utils import (DEFAULT_EXCLUSIONS, DEFAULT_SPLIT, ROOT, check_config, load_exclusions,  # noqa: E402
+from sc_utils import (DEFAULT_SPLIT, ROOT, check_config,  # noqa: E402
                       load_split, read_jsonl)
 
 
@@ -34,7 +34,6 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--data", type=Path, nargs="+", required=True, help="Example jsonl files")
     p.add_argument("--max-per-file", type=int, help="Cap examples taken from each file (random, seeded)")
     p.add_argument("--split-file", type=Path, default=DEFAULT_SPLIT)
-    p.add_argument("--exclusions", type=Path, default=DEFAULT_EXCLUSIONS)
     p.add_argument("--output-dir", type=Path, required=True)
     p.add_argument("--model-path", type=Path, default=Path("models/Qwen3-VL-8B-Instruct"))
     p.add_argument("--epochs", type=float, default=2.0)
@@ -57,7 +56,6 @@ def parser() -> argparse.ArgumentParser:
 
 def load_examples(args, root: Path) -> tuple[list[dict], dict]:
     split = load_split(root, args.split_file)
-    excluded = load_exclusions(root, args.exclusions if str(args.exclusions) else None)
     rng = random.Random(args.seed)
     examples, counts = [], Counter()
     for path in args.data:
@@ -66,9 +64,7 @@ def load_examples(args, root: Path) -> tuple[list[dict], dict]:
             rows = rng.sample(rows, args.max_per_file)
         for ex in rows:
             sid = ex.get("meta", {}).get("sample_id")
-            if sid in excluded:
-                counts["dropped_excluded"] += 1
-            elif sid not in split["train"]:
+            if sid not in split["train"]:
                 counts["dropped_not_in_train_split"] += 1
             else:
                 examples.append(ex)
@@ -94,7 +90,7 @@ def main() -> int:
     out_dir = (root / args.output_dir).resolve()
     examples, counts = load_examples(args, root)
     if not examples:
-        raise SystemExit("ERROR: no training examples left after the split/exclusion filter")
+        raise SystemExit("ERROR: no training examples match the selected training split")
     config = {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()
               if k not in ("resume_adapter", "resume_step", "log_every", "save_every")}
     config["data"] = [str(p) for p in args.data]

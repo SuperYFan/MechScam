@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from scamcourt_common import (  # noqa: E402
     SIDE_LABEL, citations_visible, debate_context, debater_extra, debater_system_prompt, judge_extra,
     judge_system_prompt, judge_target, load_manifest, load_sample, load_true_openings, read_json, read_jsonl,
-    render_transcript, role_example, taxonomy_maps, true_opening_for, user_content,  # noqa: F401
+    render_transcript, role_example, score_matches_record, taxonomy_maps, true_opening_for, user_content,  # noqa: F401
 )
 
 ROLES = ("false_opening", "false_rebuttal", "true_opening", "true_rebuttal", "judge")
@@ -51,8 +51,8 @@ def parser() -> argparse.ArgumentParser:
                    help="Arguments within this p(wrong) of the best count as tied; ties are broken by a hash "
                         "of the sample ID (not always the first strategy)")
     p.add_argument("--true-openings-dir", type=Path, default=Path("data/arguments/true_openings"))
-    p.add_argument("--allow-template-true-opening", action="store_true",
-                   help="Fall back to the annotation-template true opening (leaks the correct side by style)")
+    p.add_argument("--allow-template-true-opening", action=argparse.BooleanOptionalAction, default=True,
+                   help="Use the existing reference_opening when no rewritten opening is stored (default: enabled)")
     p.add_argument("--exclude-weak", action="store_true",
                    help="Drop arguments the teacher rated argument_strength=weak (weak-case reruns)")
     p.add_argument("--split-file", type=Path,
@@ -113,7 +113,7 @@ def main() -> int:
     counts = Counter()
     for path in sorted(arguments_dir.glob("*/*.json")):
         record = read_json(path)
-        if record.get("review_status") not in ("generated", "reviewed") or not record.get("arguments"):
+        if not record.get("arguments"):
             continue
         sid = record["sample_id"]
         counts["videos_with_arguments"] += 1
@@ -131,11 +131,11 @@ def main() -> int:
             indices = [0] if args.first_only else list(range(len(record["arguments"])))
         else:
             score = selected.get(sid)
-            if score is None or score.get("input_fingerprint") != record["input_fingerprint"] or \
-                    score.get("true_opening_provenance", "template") != true_provenance:
+            if score is None or not score_matches_record(score, record, true_provenance):
                 counts["missing_or_stale_score"] += 1
-                continue
-            if args.all_arguments:
+                indices = list(range(len(record["arguments"]))) if args.all_arguments else [0]
+                counts["selected_existing_without_score"] += 1
+            elif args.all_arguments:
                 indices = list(range(len(record["arguments"])))
             else:
                 index, how = pick_argument(score, args.tie_epsilon)

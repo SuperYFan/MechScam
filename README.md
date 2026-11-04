@@ -18,7 +18,6 @@ data/
     dataset_info.json
   splits/
     scamcourt_v3_seed42.json  train (5,290) / test (1,324) split used in all experiments
-    exclusions.json           5 training videos excluded from ScamCourt training data
   arguments/
     teacher_arguments/        per video: 3 wrong-side arguments (opening, rebuttal, reference-side reply)
     true_openings/            per video: reference-side opening in the advocate register
@@ -47,6 +46,9 @@ Each `sample.json` contains:
 
 Hard negatives are non-scam test videos with at least one potential scam element (543 videos).
 
+Data preparation uses the released annotations and arguments with the fixed
+split of 5,290 training videos and 1,324 test videos.
+
 E-mail addresses and phone numbers appearing in titles, descriptions and transcripts are replaced by `[EMAIL]` and `[PHONE]` throughout the release (sources, annotations and arguments alike, so every citation remains a verbatim excerpt).
 
 Annotations are research descriptions of video content. They do not establish legal culpability or verified financial outcomes for any person, channel or project.
@@ -57,6 +59,7 @@ The videos and their frames remain the property of their creators and are subjec
 
 - **Rebuild the frames yourself.** `python scripts/download_frames.py --workers 4` downloads each video by its ID (`https://www.youtube.com/watch?v=<video_id>`) and extracts its frames; it is resumable and logs unavailable videos to `work/download_frames.jsonl`. Frames are expected at `data/mechscam/samples/<collection>/<video_id>/frames/000001.jpg, 000002.jpg, ...`, with the number of frames given by `frame_count` in the manifest, sampled uniformly over the video (frame `k` of `N` is decoded frame `int(k * (T - 1) / (N - 1))` of `T`). Some videos have been removed from YouTube since collection, and re-encoded downloads may differ slightly from the frames used in the paper.
 - **Request the original frames.** The original frames are available to researchers for non-commercial research upon request to the authors. Please contact the authors from an institutional address with your name, affiliation, and intended use, and confirm that you will (1) use the data only for non-commercial research, (2) not redistribute the frames or any part of them, and (3) delete them on request.
+- **Takedown.** If you are the owner of a video in MechScam and want it removed, please contact the authors with the video ID.
 
 The two source collections are VidScam (`vidscamnet` in the data, 3,079 videos) and YouTube\_Scam (`youtube_scam`, 3,535 videos); please also cite them if you use MechScam. Transcripts were produced with Whisper large-v3, with non-English speech translated into English.
 

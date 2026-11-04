@@ -1,0 +1,22 @@
+{
+  "source_url": "https://support.google.com/youtube/answer/2801973?hl=en",
+  "note": "Research paraphrase for analysis; IDs are local, not official YouTube policy clause numbers.",
+  "criteria": [
+    {
+      "id": "P_RETURN",
+      "text": "Examine promotion of rapid or unusually easy wealth: identify the specific promise, required participation and stated conditions. Investment discussion or a return figure alone cannot establish deception or fraud."
+    },
+    {
+      "id": "P_IDENTITY_DATA",
+      "text": "Examine an alleged job, support identity or affiliation linked to requests for private information or money. Establish the claim and request from evidence; do not infer impersonation from a logo or infer theft from an input field."
+    },
+    {
+      "id": "P_DIVERSION",
+      "text": "Examine benefit promises used to direct viewers to another destination. Ordinary external links are insufficient; distinguish observed conditions from guessed destination behavior or unverified harm."
+    },
+    {
+      "id": "P_MISMATCH",
+      "text": "Examine misleading promised content only when the promise and conflicting delivered content are both observable. Sparse sampling, omitted speech or an unseen outcome do not establish a mismatch."
+    }
+  ]
+}

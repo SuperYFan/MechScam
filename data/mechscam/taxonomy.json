@@ -1,0 +1,92 @@
+{
+  "binary_labels": [
+    "Scam",
+    "Non-scam"
+  ],
+  "subtypes": [
+    {
+      "id": "S01",
+      "label": "Scam",
+      "name": "Low-barrier reward or asset acquisition",
+      "definition": "A free or unusually easy-to-obtain reward, digital asset, game asset, cash payment, or withdrawal is linked to a viewer action. This includes external claim or verification flows, explicit generator/bypass claims, and simple app/task income flows. Identify the actual promise-action relationship; a gift, game, app, or income topic alone is insufficient.",
+      "paper_name": "Reward Claims"
+    },
+    {
+      "id": "S02",
+      "label": "Scam",
+      "name": "Trading bot or funded-contract returns",
+      "definition": "A bot, arbitrage, flashloan, MEV or sniper workflow is linked to profit and deployment, activation, configuration, funding or trading permissions. Do not fabricate deposits when only promotion is observed.",
+      "paper_name": "Trading Bots"
+    },
+    {
+      "id": "S03",
+      "label": "Scam",
+      "name": "Investment pool, lending or staking returns",
+      "definition": "Participation in a pool, lending, staking or managed investment is linked to emphasized fixed, passive or compounding returns. A return figure alone is not evidence of deception.",
+      "paper_name": "Platform Investments"
+    },
+    {
+      "id": "S04",
+      "label": "Scam",
+      "name": "Paid mining or node returns",
+      "definition": "Purchasing hashpower, mining packages, equipment shares, memberships or nodes is linked to recurring mining/node income.",
+      "paper_name": "Mining and Nodes"
+    },
+    {
+      "id": "S05",
+      "label": "Scam",
+      "name": "Token purchase, appreciation or dividends",
+      "definition": "Buying tokens, a presale, tokenized products or NFTs is linked to appreciation, listing gains, dividends or holding returns. Market commentary without a participation pathway is insufficient.",
+      "paper_name": "Token Investments"
+    },
+    {
+      "id": "S06",
+      "label": "Scam",
+      "name": "Recruitment commissions and tiered matrices",
+      "definition": "Income depends on downlines, team structures, matrices, uplines, slots or tier qualification. A normal disclosed one-level referral code does not establish this structure.",
+      "paper_name": "Recruitment Commissions"
+    },
+    {
+      "id": "N01",
+      "label": "Non-scam",
+      "name": "Anti-scam warnings, investigations and tests",
+      "definition": "The primary theme is warning, examining, criticizing, testing or scambaiting; depicted third-party scam mechanisms are not automatically creator endorsements.",
+      "paper_name": "Scam Awareness and Investigation"
+    },
+    {
+      "id": "N02",
+      "label": "Non-scam",
+      "name": "Financial news and market analysis",
+      "definition": "The primary theme is market news, financial events, conditional forecasts or investment commentary, not certification that every claim is true.",
+      "paper_name": "Financial News and Analysis"
+    },
+    {
+      "id": "N03",
+      "label": "Non-scam",
+      "name": "Education, technology and operational demonstrations",
+      "definition": "Programming, tools, business skills, principles or ordinary operational tutorials are central. Scam testing belongs to N01; market predictions belong to N02; recipes and general lifestyle belong to N06.",
+      "paper_name": "Education and Tutorials"
+    },
+    {
+      "id": "N04",
+      "label": "Non-scam",
+      "name": "Ordinary products, commerce and services",
+      "definition": "Retail products, prices, purchases, business activities or services are central. Do not certify an external service as safe.",
+      "paper_name": "Products and Services"
+    },
+    {
+      "id": "N05",
+      "label": "Non-scam",
+      "name": "Ordinary rewards, loyalty and promotions",
+      "definition": "Discounts, cashback, loyalty points, giveaways or referral promotions are central in their observed context, not an inferred guarantee of safety.",
+      "paper_name": "Rewards and Promotions"
+    },
+    {
+      "id": "N06",
+      "label": "Non-scam",
+      "name": "General news, lifestyle and entertainment",
+      "definition": "Music, sport, comedy, cooking, history, lifestyle or other general content is central.",
+      "paper_name": "General Content"
+    }
+  ]
+}

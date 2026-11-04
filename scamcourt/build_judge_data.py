@@ -23,7 +23,7 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from sc_utils import (DEFAULT_DATASET, DEFAULT_EXCLUSIONS, DEFAULT_SPLIT, ROOT, Dataset, load_exclusions,  # noqa: E402
+from sc_utils import (DEFAULT_DATASET, DEFAULT_SPLIT, ROOT, Dataset,  # noqa: E402
                       load_split, read_jsonl, scc, select_ids, stratified_subsample, write_json, write_jsonl)
 
 
@@ -32,7 +32,6 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--project-root", type=Path, default=ROOT)
     p.add_argument("--dataset-dir", type=Path, default=DEFAULT_DATASET)
     p.add_argument("--split-file", type=Path, default=DEFAULT_SPLIT)
-    p.add_argument("--exclusions", type=Path, default=DEFAULT_EXCLUSIONS)
     p.add_argument("--debates", type=Path, nargs="*", default=[])
     p.add_argument("--no-transcript-fraction", type=float, default=0.25)
     p.add_argument("--classifier-only", action="store_true")
@@ -58,8 +57,7 @@ def main() -> int:
     root = args.project_root.expanduser().resolve()
     ds = Dataset(root, args.dataset_dir)
     split = load_split(root, args.split_file)
-    excluded = load_exclusions(root, args.exclusions if str(args.exclusions) else None)
-    train_ids = select_ids(ds.rows, split, "train", excluded)
+    train_ids = select_ids(ds.rows, split, "train")
     allowed = set(train_ids)
     counts, rows = Counter(), []
 
@@ -74,7 +72,7 @@ def main() -> int:
             for rec in read_jsonl(root / path):
                 sid = rec["sample_id"]
                 if sid not in allowed:
-                    counts["dropped_not_train_or_excluded"] += 1
+                    counts["dropped_not_train"] += 1
                     continue
 
                 def transcript(ctx, rec=rec):

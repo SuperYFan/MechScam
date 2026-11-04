@@ -20,7 +20,6 @@ import scamcourt_common as scc  # noqa: E402
 
 LABELS = ("Scam", "Non-scam")
 DEFAULT_SPLIT = Path("data/splits/scamcourt_v3_seed42.json")
-DEFAULT_EXCLUSIONS = Path("data/splits/exclusions.json")
 DEFAULT_DATASET = Path("data/mechscam")
 
 
@@ -60,26 +59,17 @@ def check_config(path: Path, config: dict) -> None:
     write_json(path, config)
 
 
-# ---------------------------------------------------------------- split / exclusions
+# ---------------------------------------------------------------- split
 
 def load_split(root: Path, split_file: Path) -> dict[str, set[str]]:
     data = json.loads((root / split_file).read_text(encoding="utf-8"))
     return {k: set(data[k]) for k in ("train", "test")}
 
 
-def load_exclusions(root: Path, path: Path | None) -> set[str]:
-    if path is None:
-        return set()
-    full = root / path
-    if not full.exists():
-        raise SystemExit(f"ERROR: exclusion list {full} not found (pass --exclusions '' to disable)")
-    return {e["sample_id"] for e in json.loads(full.read_text(encoding="utf-8"))["excluded"]}
-
-
-def select_ids(all_ids: Iterable[str], split: dict[str, set[str]], part: str, excluded: set[str]) -> list[str]:
+def select_ids(all_ids: Iterable[str], split: dict[str, set[str]], part: str) -> list[str]:
     if part not in split:
         raise SystemExit(f"ERROR: unknown split {part!r}")
-    return sorted(i for i in all_ids if i in split[part] and i not in excluded)
+    return sorted(i for i in all_ids if i in split[part])
 
 
 def stratified_subsample(ids: list[str], key: dict[str, str], n: int | None, seed: int) -> list[str]:

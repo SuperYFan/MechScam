@@ -17,7 +17,7 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from sc_utils import (DEFAULT_DATASET, DEFAULT_EXCLUSIONS, DEFAULT_SPLIT, ROOT, Dataset, load_exclusions,  # noqa: E402
+from sc_utils import (DEFAULT_DATASET, DEFAULT_SPLIT, ROOT, Dataset,  # noqa: E402
                       load_split, read_jsonl, scc, write_json, write_jsonl)
 
 
@@ -26,7 +26,6 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--project-root", type=Path, default=ROOT)
     p.add_argument("--dataset-dir", type=Path, default=DEFAULT_DATASET)
     p.add_argument("--split-file", type=Path, default=DEFAULT_SPLIT)
-    p.add_argument("--exclusions", type=Path, default=DEFAULT_EXCLUSIONS)
     p.add_argument("--split", default="test")
     p.add_argument("--arguments-dir", type=Path, default=Path("data/arguments/teacher_arguments"))
     p.add_argument("--true-openings-dir", type=Path, default=Path("data/arguments/true_openings"))
@@ -41,8 +40,7 @@ def main() -> int:
     root = args.project_root.expanduser().resolve()
     ds = Dataset(root, args.dataset_dir)
     split = load_split(root, args.split_file)
-    excluded = load_exclusions(root, args.exclusions if str(args.exclusions) else None)
-    wanted = split[args.split] - excluded
+    wanted = split[args.split]
     true_openings = scc.load_true_openings((root / args.true_openings_dir).resolve())
     scores = {}
     if (root / args.scores).exists():
@@ -55,10 +53,10 @@ def main() -> int:
         sid = rec.get("sample_id")
         if sid not in wanted:
             continue
-        if rec.get("review_status") not in ("generated", "reviewed") or not rec.get("arguments"):
+        if not rec.get("arguments"):
             counts["videos_without_arguments"] += 1
             continue
-        found = scc.true_opening_for(rec, true_openings, allow_template=False)
+        found = scc.true_opening_for(rec, true_openings, allow_template=True)
         true_opening = None
         if found:
             ref = found[0]
@@ -67,7 +65,7 @@ def main() -> int:
         else:
             counts["videos_without_true_opening"] += 1
         score = scores.get(sid)
-        if score and score.get("input_fingerprint") != rec["input_fingerprint"]:
+        if score and not scc.score_matches_record(score, rec, found[1] if found else None):
             score = None
             counts["stale_scores_ignored"] += 1
         counts["videos"] += 1
@@ -78,7 +76,6 @@ def main() -> int:
                 "gold_label": rec["gold_label"], "gold_subtype": rec["gold_subtype"],
                 "true_side": rec["true_side"], "wrong_side": rec["wrong_side"], "wrong_label": rec["wrong_label"],
                 "strategy": arg["strategy"], "argument_strength": arg.get("argument_strength") or "normal",
-                "weak_case_mode": bool(rec.get("weak_case_mode")),
                 "wrong_opening": {"claim_label": rec["wrong_label"], "claimed_subtype": arg["claimed_subtype"],
                                   "argument": arg["opening"]["argument"], "citations": arg["opening"]["citations"]},
                 "wrong_rebuttal": arg["rebuttal"], "true_reply": arg["true_side_reply"],

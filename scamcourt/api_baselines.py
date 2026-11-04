@@ -45,9 +45,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from sc_utils import (DEFAULT_DATASET, DEFAULT_EXCLUSIONS, DEFAULT_SPLIT, FALLBACK_REBUTTAL, LABELS, ROOT,  # noqa: E402
+from sc_utils import (DEFAULT_DATASET, DEFAULT_SPLIT, FALLBACK_REBUTTAL, LABELS, ROOT,  # noqa: E402
                       Dataset, adversarial_metrics, check_config, citation_stats, refresh_gold, fallback_opening, has_risk_cues,
-                      judge_metrics, load_exclusions, load_split, mean, parse_opening, parse_rebuttal,
+                      judge_metrics, load_split, mean, parse_opening, parse_rebuttal,
                       parse_verdict, read_jsonl, scc, select_ids, stratified_subsample, write_json)
 
 from run_debate import role_reminder  # noqa: E402
@@ -61,7 +61,6 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--project-root", type=Path, default=ROOT)
     p.add_argument("--dataset-dir", type=Path, default=DEFAULT_DATASET)
     p.add_argument("--split-file", type=Path, default=DEFAULT_SPLIT)
-    p.add_argument("--exclusions", type=Path, default=DEFAULT_EXCLUSIONS)
     p.add_argument("--split", default="test")
     p.add_argument("--subsample", type=int, help="Stratified subset of N videos (same subset for every model)")
     p.add_argument("--limit", type=int, help="First N videos (smoke tests)")
@@ -377,7 +376,7 @@ class Runner:
                     {a["wrong_side"]: a["wrong_rebuttal"], a["true_side"]: a["true_reply"]}, self.ds.names)
             row.update(self.judge(ctx, transcript, stop, usage))
             row.update(item_id=a["item_id"], protocol=item["kind"], strategy=a["strategy"],
-                       argument_strength=a["argument_strength"], weak_case_mode=a["weak_case_mode"],
+                       argument_strength=a["argument_strength"], weak_case_mode=a.get("weak_case_mode", False),
                        qwen_selected=a["qwen_selected"], gold_label=a["gold_label"], gold_subtype=a["gold_subtype"],
                        wrong_label=a["wrong_label"])
         row["usage"] = dict(usage)
@@ -461,8 +460,7 @@ def main() -> int:
         raise SystemExit("ERROR: --model is required")
     ds = Dataset(root, args.dataset_dir)
     split = load_split(root, args.split_file)
-    excluded = load_exclusions(root, args.exclusions if str(args.exclusions) else None)
-    ids = select_ids(ds.rows, split, args.split, excluded)
+    ids = select_ids(ds.rows, split, args.split)
     ids = stratified_subsample(ids, {i: ds.rows[i]["primary_subtype"] for i in ids}, args.subsample, args.seed)
     if args.limit:
         ids = ids[:args.limit]

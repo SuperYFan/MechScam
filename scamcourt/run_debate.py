@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ScamCourt step 5: run full debates with a debater model (no teacher text involved).
 
-For every video of --split (minus the exclusion list) and every sample k:
+For every video of --split and every sample k:
   1. OPENING  : prosecution and defense statements (same model, side-specific system prompt)
   2. REBUTTAL : each side answers the other's opening
 Outputs are parsed and FORMAT-checked (side's label, a category of that side, non-empty text);
@@ -23,8 +23,8 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from sc_utils import (DEFAULT_DATASET, DEFAULT_EXCLUSIONS, DEFAULT_SPLIT, FALLBACK_REBUTTAL, ROOT,  # noqa: E402
-                      Dataset, check_config, citation_stats, fallback_opening, load_exclusions, load_split,
+from sc_utils import (DEFAULT_DATASET, DEFAULT_SPLIT, FALLBACK_REBUTTAL, ROOT,  # noqa: E402
+                      Dataset, check_config, citation_stats, fallback_opening, load_split,
                       parse_opening, parse_rebuttal, read_jsonl, scc, select_ids, stratified_subsample)
 
 
@@ -33,7 +33,6 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--project-root", type=Path, default=ROOT)
     p.add_argument("--dataset-dir", type=Path, default=DEFAULT_DATASET)
     p.add_argument("--split-file", type=Path, default=DEFAULT_SPLIT)
-    p.add_argument("--exclusions", type=Path, default=DEFAULT_EXCLUSIONS)
     p.add_argument("--split", choices=("train", "test"), required=True)
     p.add_argument("--subsample", type=int, help="Stratified (by subtype) subset of N videos")
     p.add_argument("--limit", type=int, help="First N videos (smoke tests)")
@@ -100,8 +99,7 @@ def main() -> int:
     root = args.project_root.expanduser().resolve()
     ds = Dataset(root, args.dataset_dir)
     split = load_split(root, args.split_file)
-    excluded = load_exclusions(root, args.exclusions if str(args.exclusions) else None)
-    ids = select_ids(ds.rows, split, args.split, excluded)
+    ids = select_ids(ds.rows, split, args.split)
     ids = stratified_subsample(ids, {i: ds.rows[i]["primary_subtype"] for i in ids}, args.subsample, args.seed)
     if args.limit:
         ids = ids[:args.limit]
@@ -111,7 +109,7 @@ def main() -> int:
               "samples_per_video": args.samples_per_video, "temperature": args.temperature, "top_p": args.top_p,
               "max_new_tokens": args.max_new_tokens, "attempts": args.attempts, "max_frames": args.max_frames,
               "max_text_chars": args.max_text_chars, "max_image_pixels": args.max_image_pixels,
-              "seed": args.seed, "excluded": sorted(excluded), "role_reminder": args.role_reminder}
+              "seed": args.seed, "role_reminder": args.role_reminder}
     out_path = out_dir / "debates.jsonl"
     done = set()
     if not args.dry_run:
